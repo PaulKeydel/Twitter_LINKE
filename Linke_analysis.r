@@ -4,6 +4,7 @@ library(stringr)
 library(tidyr)
 library(gridExtra)
 library(grid)
+library(ggplot2)
 
 twitter <- read_delim("~/Documents/coding projects/Twitter_LINKE/LINKE_data.csv",
                       delim = ";", locale = locale(decimal_mark = ".")
@@ -28,31 +29,39 @@ grid.table(hashtag_df %>%
     filter(count > 2)
 )
 
-twitter$message <- sapply(strwrap(twitter$text, width = 50, simplify = FALSE), paste, collapse = "\n")
-grid.newpage()
-grid.table(twitter %>%
+interactions_per_week <- twitter %>%
     filter(is.na(rt_source)) %>%
-    mutate(interactions = (likes + retweets) / age) %>%
-    select(interactions, hashtags, message, creat_time) %>%
-    arrange(desc(interactions)) %>%
-    slice(1:10)
+    group_by(creat_week) %>%
+    summarise(day = max(creat_time), interactions = sum(likes) + sum(retweets), sumage = sum(age)) %>%
+    mutate(impact = interactions / sumage) %>%
+    arrange(day)
+
+barplot(height = interactions_per_week$impact,
+        names = interactions_per_week$creat_week,
+        main = "Interaktionen auf Tweets per Stunde",
+        xlab = "Kalenderwoche, 2022/23",
+        ylab = "Interaktionen auf Tweets per Stunde",
+        ylim = c(0, 3),
+        col = "#8EBBE4"
 )
 
-grid.newpage()
-grid.table(twitter["rt_source"] %>%
+#export single RT sources to new csv file for further analysis
+write.csv(twitter["rt_source"] %>%
     filter(!is.na(rt_source)) %>%
     group_by(rt_source) %>%
     summarise(count = n()) %>%
-    arrange(desc(count)) %>%
-    mutate(relative = count / sum(count))
+    arrange(desc(count)),
+    "single_rt_sources.csv"
 )
 
 freq_ht <- table(ifelse(hashtag_df$count > 2, 2,
                  ifelse(hashtag_df$count > 1, 1, 0)))
+
+par(mar = c(1, 4, 4, 2) + 0.1)
 pie(freq_ht,
     labels = c(paste("einmal benutzt\n", round(100 * as.numeric(freq_ht)[1] / nrow(hashtag_df), 1), "%"),
                paste("zweimal benutzt\n", round(100 * as.numeric(freq_ht)[2] / nrow(hashtag_df), 1), "%"),
-               paste("mehrmals benutzt\n", round(100 * as.numeric(freq_ht)[3] / nrow(hashtag_df), 1), "%")),
+               paste("mehr als 2-mal benutzt\n", round(100 * as.numeric(freq_ht)[3] / nrow(hashtag_df), 1), "%")),
     col = c("#8EE4E2", "#8EBBE4", "#8EE4B7"),
     main = paste("einmalig / mehrmals verwendete Hashtags, N = ", nrow(hashtag_df))
 )
@@ -62,13 +71,13 @@ rt_src_stats <- twitter["rt_source"] %>%
     group_by(rt_source) %>%
     summarise(count0 = n()) %>%
     arrange(desc(count0)) %>%
-    mutate(rt_source_thr = ifelse(count0 / sum(count0) < 0.015, "Other", rt_source)) %>%
+    mutate(rt_source_thr = ifelse(count0 / sum(count0) < 0.01, "Other", rt_source)) %>%
     group_by(rt_source_thr) %>%
     summarise(count = sum(count0)) %>%
     mutate(pct = round(count / sum(count) * 100, 1)) %>%
     arrange(desc(count))
 
-#par(mar = c(10, 4, 3, 0.5)) #c(5, 4, 4, 2) + 0.1
+par(mar = c(10, 4, 3, 0.5))
 rt_bar <- barplot(
     height = rt_src_stats$pct,
     names = rt_src_stats$rt_source_thr,
@@ -90,18 +99,29 @@ posted_tweets <- table(factor(twitter$tweet_kind),
 )
 print(posted_tweets)
 
+par(mar = c(5, 4, 4, 2) + 0.1) #this are the default margins
 barplot(posted_tweets,
         main = paste("Anzahl (Re)Tweets, N = ", nrow(twitter)),
         xlab = "Kalenderwoche, 2022/23",
         ylab = "Anzahl",
-        ylim = c(0, 60),
+        ylim = c(0, 70),
         col = c("lightblue", "#bae4ba"),
         legend.text = rownames(posted_tweets),
+        args.legend = list(x = "topleft", inset = c(0.05, 0)),
         beside = TRUE
 )
 grid(nx = NA,
      ny = NULL,
-     lty = 2, col = "#d1c7c7", lwd = 0.5
+     lty = 2, col = "#d1c7c7", lwd = 0.3
 )
 
-str_detect(twitter$message, "riefahl")
+text_data <- str_replace_all(casefold(twitter$text), c("ü" = "ue", "ä" = "ae", "ö" = "oe"))
+sum(str_detect(text_data, "briefwahl"))
+sum(str_detect(text_data, "klima"))
+sum(str_detect(text_data, "luetzi"))
+sum(str_detect(text_data, "luetzerath"))
+sum(str_detect(text_data, "oeko"))
+sum(str_detect(text_data, "future"))
+sum(str_detect(text_data, "protest"))
+sum(str_detect(text_data, "silvester"))
+sum(str_detect(text_data, "sozial"))
