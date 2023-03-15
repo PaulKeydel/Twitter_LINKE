@@ -4,7 +4,15 @@ library(stringr)
 library(tidyr)
 library(gridExtra)
 library(grid)
-library(ggplot2)
+
+#lower all alphanumerical characters
+#replace umlauts
+#remove all non-alphanumerical characters
+transform_text_col <- function(txtcol) {
+    return(str_replace_all(casefold(txtcol), c("ü" = "ue", "ä" = "ae", "ö" = "oe")) %>%
+           str_replace_all("[^[:alnum:]]", "")
+    )
+}
 
 twitter <- read_delim("~/Documents/coding projects/Twitter_LINKE/LINKE_data.csv",
                       delim = ";", locale = locale(decimal_mark = ".")
@@ -18,6 +26,7 @@ for (row in 1:nrow(twitter)) {
         ht_words <- c(ht_words, unlist(strsplit(twitter$hashtags[row], split = ",")))
     }
 }
+ht_words <- transform_text_col(ht_words)
 hashtag_df <- data.frame(hashtag = unlist(ht_words)) %>%
     group_by(hashtag) %>%
     summarise(count = n())
@@ -115,13 +124,21 @@ grid(nx = NA,
      lty = 2, col = "#d1c7c7", lwd = 0.3
 )
 
-text_data <- str_replace_all(casefold(twitter$text), c("ü" = "ue", "ä" = "ae", "ö" = "oe"))
-sum(str_detect(text_data, "briefwahl"))
-sum(str_detect(text_data, "klima"))
-sum(str_detect(text_data, "luetzi"))
-sum(str_detect(text_data, "luetzerath"))
-sum(str_detect(text_data, "oeko"))
-sum(str_detect(text_data, "future"))
-sum(str_detect(text_data, "protest"))
-sum(str_detect(text_data, "silvester"))
-sum(str_detect(text_data, "sozial"))
+text_entities <- list("co2",
+                      "klima",
+                      "luetzi",
+                      "luetzerath",
+                      "oeko",
+                      "treibhaus",
+                      "energiewende",
+                      "sozial",
+                      "rente",
+                      "armut",
+                      "wohnungslos",
+                      "strom",
+                      "obdachlosigkeit",
+                      "waerme"
+)
+for (it in text_entities) {
+    print(paste0(it, " : ", sum(str_detect(transform_text_col(twitter$text), it))))
+}
