@@ -54,25 +54,35 @@ barplot(height = interactions_per_week$impact,
         col = "#8EBBE4"
 )
 
-#export single RT sources to new csv file for further analysis
-write.csv(twitter["rt_source"] %>%
-    filter(!is.na(rt_source)) %>%
-    group_by(rt_source) %>%
-    summarise(count = n()) %>%
-    arrange(desc(count)),
-    "single_rt_sources.csv"
-)
+if (TRUE) {
+    #Retweets: How many accounts are related to the party?
+    rt_csv <- read_delim("~/Documents/coding projects/Twitter_LINKE/single_rt_sources.csv")
+    print(table(replace_na(rt_csv$is_from_party, 0)))
+} else {
+    #export single RT sources to new csv file for further analysis
+    write.csv(twitter["rt_source"] %>%
+        filter(!is.na(rt_source)) %>%
+        group_by(rt_source) %>%
+        summarise(count = n()) %>%
+        arrange(desc(count)),
+        "single_rt_sources.csv"
+    )
+}
 
-freq_ht <- table(ifelse(hashtag_df$count > 2, 2,
-                 ifelse(hashtag_df$count > 1, 1, 0)))
+freq_ht <- table(ifelse(hashtag_df$count > 2, "3", hashtag_df$count))
+names(freq_ht) <- sapply(names(freq_ht), paste, "-mal", sep = "")
+names(freq_ht)[3] <- ">2-mal"
 
 par(mar = c(1, 4, 4, 2) + 0.1)
 pie(freq_ht,
-    labels = c(paste("einmal benutzt\n", round(100 * as.numeric(freq_ht)[1] / nrow(hashtag_df), 1), "%"),
-               paste("zweimal benutzt\n", round(100 * as.numeric(freq_ht)[2] / nrow(hashtag_df), 1), "%"),
-               paste("mehr als 2-mal benutzt\n", round(100 * as.numeric(freq_ht)[3] / nrow(hashtag_df), 1), "%")),
+    labels = paste(round(100 * as.numeric(freq_ht) / nrow(hashtag_df), 1), "%"),
     col = c("#8EE4E2", "#8EBBE4", "#8EE4B7"),
-    main = paste("einmalig / mehrmals verwendete Hashtags, N = ", nrow(hashtag_df))
+    main = paste("Hashtag-Verwendung, N = ", nrow(hashtag_df))
+)
+legend(0.95, .75,
+       names(freq_ht),
+       fill = c("#8EE4E2", "#8EBBE4", "#8EE4B7"),
+       title = "Nutzung"
 )
 
 rt_src_stats <- twitter["rt_source"] %>%
