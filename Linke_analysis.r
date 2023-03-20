@@ -19,6 +19,8 @@ twitter <- read_delim("~/Documents/coding projects/Twitter_LINKE/LINKE_data.csv"
 )
 
 print(twitter)
+sum(is.na(twitter$rt_source))
+sum(!is.na(twitter$rt_source))
 
 ht_words <- list()
 for (row in 1:nrow(twitter)) {
@@ -57,7 +59,14 @@ barplot(height = interactions_per_week$impact,
 if (TRUE) {
     #Retweets: How many accounts are related to the party?
     rt_csv <- read_delim("~/Documents/coding projects/Twitter_LINKE/single_rt_sources.csv")
-    print(table(replace_na(rt_csv$is_from_party, 0)))
+    stopifnot(nrow(rt_csv) == length(unique(na.omit(twitter$rt_source))))
+    stopifnot(sum(rt_csv$count) == sum(!is.na(twitter$rt_source)))
+    rt_csv$is_from_party <- replace_na(rt_csv$is_from_party, 0)
+    print(table(rt_csv$is_from_party))
+    print(rt_csv %>%
+          group_by(is_from_party) %>%
+          summarise(party_content = sum(count) / sum(rt_csv$count))
+    )
 } else {
     #export single RT sources to new csv file for further analysis
     write.csv(twitter["rt_source"] %>%
@@ -90,24 +99,25 @@ rt_src_stats <- twitter["rt_source"] %>%
     group_by(rt_source) %>%
     summarise(count0 = n()) %>%
     arrange(desc(count0)) %>%
-    mutate(rt_source_thr = ifelse(count0 / sum(count0) < 0.01, "Other", rt_source)) %>%
+    mutate(rt_source_thr = ifelse(count0 / sum(count0) < 0.01, "Nebensächliche Accounts", rt_source)) %>%
     group_by(rt_source_thr) %>%
     summarise(count = sum(count0)) %>%
     mutate(pct = round(count / sum(count) * 100, 1)) %>%
-    arrange(desc(count))
+    arrange(count)
 
-par(mar = c(10, 4, 3, 0.5))
+par(mar = c(3, 11.5, 4, 2))
 rt_bar <- barplot(
     height = rt_src_stats$pct,
     names = rt_src_stats$rt_source_thr,
-    ylim = c(0, 40),
+    xlim = c(0, 30),
     col = "#8EBBE4",
-    main = paste("Quellen der Retweets, N = ", sum(rt_src_stats$count)),
-    ylab = "Anzahl in Prozent",
+    main = paste("Verwendung der Retweet-Accounts, N = ", length(unique(na.omit(twitter$rt_source)))),
+    axes = FALSE,
     beside = TRUE,
+    horiz = TRUE,
     las = 2
 )
-text(rt_bar, rt_src_stats$pct + 2.0, paste(rt_src_stats$pct, "%", sep = ""))
+text(rt_src_stats$pct + 1.5, rt_bar, paste(rt_src_stats$pct, "%", sep = ""))
 
 twitter <- mutate(twitter,
                   tweet_kind = ifelse(is.na(rt_source), "Tweet", "Retweet")
@@ -139,16 +149,27 @@ text_entities <- list("co2",
                       "luetzi",
                       "luetzerath",
                       "oeko",
-                      "treibhaus",
+                      "nahverkehr",
                       "energiewende",
                       "sozial",
                       "rente",
                       "armut",
                       "wohnungslos",
-                      "strom",
-                      "obdachlosigkeit",
+                      "schule",
+                      "obdachlos",
                       "waerme"
 )
 for (it in text_entities) {
     print(paste0(it, " : ", sum(str_detect(transform_text_col(twitter$text), it))))
 }
+
+#interaction score Si
+print(twitter$text[str_detect(transform_text_col(twitter$text), "miete") & is.na(twitter$rt_source)])
+print(twitter$text[str_detect(transform_text_col(twitter$text), "vergesellschaft") & is.na(twitter$rt_source)])
+twitter <- twitter %>% mutate(Si = (likes + retweets) / age)
+print(paste("Durchschnittliche Interaktionen pro Std.: ",
+            mean(twitter$Si[is.na(twitter$rt_source)])))
+print(paste("Durchschnittliche Interaktionen pro Std. zum Thema Mieten: ",
+            mean(twitter$Si[is.na(twitter$rt_source) & str_detect(transform_text_col(twitter$text), "miete")])))
+print(paste("Durchschnittliche Interaktionen pro Std. zum Thema Vergesellschaftung: ",
+            mean(twitter$Si[is.na(twitter$rt_source) & str_detect(transform_text_col(twitter$text), "vergesellschaft")])))
